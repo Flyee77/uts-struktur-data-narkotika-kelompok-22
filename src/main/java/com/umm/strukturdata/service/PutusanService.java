@@ -31,7 +31,7 @@ public class PutusanService {
 
     public void loadFromCsv(String filePath) throws IOException {
         daftarPutusan.clear();
-        DynamicArray<Putusan> loaded = CsvParser.parsePutusanCsv(filePath);
+        DynamicArray<Putusan> loaded = CsvParser.loadFromCsv(filePath);
         for (int i = 0; i < loaded.size(); i++) {
             daftarPutusan.add(loaded.get(i));
         }
