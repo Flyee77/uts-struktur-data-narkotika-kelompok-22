@@ -1,0 +1,9 @@
+case_id,field_name,value,source_file,source_page,extractor,reviewer,status
+P001,vonisBulan,60,putusan_001.pdf,20,Flyee,muhamadarjun-de,verified
+P001,beratBarangBuktiGram,49.39,putusan_001.pdf,3,Flyee,muhamadarjun-de,verified
+P001,pasalTerbukti,Pasal 114 ayat (1) UU No. 35 Tahun 2009,putusan_001.pdf,19,Flyee,muhamadarjun-de,verified
+P001,dendaRupiah,1000000000,putusan_001.pdf,20,Flyee,muhamadarjun-de,verified
+P002,vonisBulan,48,putusan_002.pdf,15,muhamadarjun-de,Flyee,verified
+P002,beratBarangBuktiGram,1.25,putusan_002.pdf,4,muhamadarjun-de,Flyee,verified
+P002,pasalTerbukti,Pasal 112 ayat (1) UU No. 35 Tahun 2009,putusan_002.pdf,14,muhamadarjun-de,Flyee,verified
+P002,dendaRupiah,800000000,putusan_002.pdf,15,muhamadarjun-de,Flyee,verified
