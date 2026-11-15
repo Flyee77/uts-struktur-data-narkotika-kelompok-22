@@ -1,4 +1,4 @@
-﻿package com.umm.strukturdata.app;
+package com.umm.strukturdata.app;
 
 import com.umm.strukturdata.datastructure.ArrayStack;
 import com.umm.strukturdata.datastructure.DynamicArray;
@@ -132,8 +132,8 @@ public class MainApp {
                     case "9":
                         ArrayStack<String> stack = service.getAuditLog();
                         System.out.println("=== RIWAYAT AKTIVITAS (TERBARU DI ATAS) ===");
-                        for (int i = stack.size() - 1; i >= 0; i--) {
-                            System.out.println((stack.size() - i) + ". " + stack.get(i));
+                        for (int i = 0; i < stack.size(); i++) {
+                            System.out.println((i + 1) + ". " + stack.getFromTop(i));
                         }
                         break;
                     case "10":

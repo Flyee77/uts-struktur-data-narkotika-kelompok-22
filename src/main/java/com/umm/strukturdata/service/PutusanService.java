@@ -1,4 +1,4 @@
-﻿package com.umm.strukturdata.service;
+package com.umm.strukturdata.service;
 
 import com.umm.strukturdata.datastructure.ArrayStack;
 import com.umm.strukturdata.datastructure.DynamicArray;
