@@ -5,20 +5,38 @@ import com.umm.strukturdata.datastructure.DynamicArray;
 import com.umm.strukturdata.model.Putusan;
 
 import java.io.BufferedWriter;
-import java.io.FileOutputStream;
+import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.OutputStreamWriter;
-import java.nio.charset.StandardCharsets;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 
 public class PutusanService {
-    private DynamicArray<Putusan> daftarPutusan;
-    private ArrayStack<String> auditLog;
+    private final DynamicArray<Putusan> daftarPutusan;
+    private final ArrayStack<String> auditLog;
+    private DynamicArray<Putusan> lastResult;
     private int lastSearchSteps;
 
     public PutusanService() {
-        this.daftarPutusan = new DynamicArray<>(60);
+        this.daftarPutusan = new DynamicArray<>();
         this.auditLog = new ArrayStack<>();
+        this.lastResult = daftarPutusan;
         this.lastSearchSteps = 0;
+    }
+
+    private void logActivity(String action) {
+        String time = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"));
+        auditLog.push("[" + time + "] " + action);
+    }
+
+    public void loadFromCsv(String filePath) throws IOException {
+        daftarPutusan.clear();
+        DynamicArray<Putusan> loaded = CsvParser.loadFromCsv(filePath);
+        for (int i = 0; i < loaded.size(); i++) {
+            daftarPutusan.add(loaded.get(i));
+        }
+        lastResult = daftarPutusan;
+        logActivity("LOAD_CSV: Memuat " + daftarPutusan.size() + " putusan dari " + filePath);
     }
 
     public DynamicArray<Putusan> getDaftarPutusan() {
@@ -29,199 +47,203 @@ public class PutusanService {
         return auditLog;
     }
 
+    public DynamicArray<Putusan> getLastResult() {
+        return lastResult;
+    }
+
     public int getLastSearchSteps() {
         return lastSearchSteps;
     }
 
-    // Fitur 1: Muat dataset dari CSV
-    public int loadFromCsv(String filePath) throws IOException {
-        DynamicArray<Putusan> loaded = CsvParser.loadFromCsv(filePath);
-        this.daftarPutusan = loaded;
-        auditLog.push("LOAD_CSV | Memuat " + loaded.size() + " data dari " + filePath);
-        return loaded.size();
-    }
-
-    // Fitur 3a: Tambah data baru
     public void tambahPutusan(Putusan p) {
-        if (p == null) {
-            throw new IllegalArgumentException("Data putusan tidak boleh null");
+        if (p == null || p.getCaseId() == null || p.getCaseId().trim().isEmpty()) {
+            throw new IllegalArgumentException("Data putusan atau Case ID tidak boleh kosong.");
         }
-        if (cariByCaseId(p.getCaseId()) != null) {
-            throw new IllegalArgumentException("Duplikat caseId terdeteksi: " + p.getCaseId());
+        for (int i = 0; i < daftarPutusan.size(); i++) {
+            if (daftarPutusan.get(i).getCaseId().equalsIgnoreCase(p.getCaseId().trim())) {
+                throw new IllegalArgumentException("Duplikat Case ID terdeteksi: " + p.getCaseId());
+            }
         }
         daftarPutusan.add(p);
-        auditLog.push("ADD | Menambahkan putusan " + p.getCaseId() + " (" + p.getNomorPerkara() + ")");
+        lastResult = daftarPutusan;
+        logActivity("ADD: Menambah putusan " + p.getCaseId() + " (" + p.getNomorPerkara() + ")");
     }
 
-    // Fitur 3b: Hapus data berdasarkan indeks
     public Putusan hapusPutusan(int index) {
         Putusan removed = daftarPutusan.remove(index);
-        auditLog.push("REMOVE | Menghapus putusan " + removed.getCaseId() + " pada indeks " + index);
+        lastResult = daftarPutusan;
+        logActivity("REMOVE: Menghapus putusan indeks " + index + " (" + removed.getCaseId() + ")");
         return removed;
     }
 
-    // Fitur 5a: Cari berdasarkan caseId (dengan hitung langkah)
     public Putusan cariByCaseId(String caseId) {
         lastSearchSteps = 0;
-        if (caseId == null) return null;
+        if (caseId == null) {
+            logActivity("SEARCH_ID: Pencarian null (0 langkah)");
+            return null;
+        }
         String target = caseId.trim();
         for (int i = 0; i < daftarPutusan.size(); i++) {
             lastSearchSteps++;
             Putusan p = daftarPutusan.get(i);
             if (p.getCaseId().equalsIgnoreCase(target)) {
-                auditLog.push("SEARCH_ID | Cari '" + target + "' ditemukan (" + lastSearchSteps + " langkah)");
+                logActivity("SEARCH_ID: Ditemukan '" + target + "' dalam " + lastSearchSteps + " langkah");
                 return p;
             }
         }
-        auditLog.push("SEARCH_ID | Cari '" + target + "' tidak ditemukan (" + lastSearchSteps + " langkah)");
+        logActivity("SEARCH_ID: Tidak ditemukan '" + target + "' setelah " + lastSearchSteps + " langkah");
         return null;
     }
 
-    // Fitur 5b: Cari berdasarkan nomorPerkara (dengan hitung langkah)
     public Putusan cariByNomorPerkara(String nomorPerkara) {
         lastSearchSteps = 0;
-        if (nomorPerkara == null) return null;
+        if (nomorPerkara == null) {
+            logActivity("SEARCH_NO: Pencarian null (0 langkah)");
+            return null;
+        }
         String target = nomorPerkara.trim().toLowerCase();
         for (int i = 0; i < daftarPutusan.size(); i++) {
             lastSearchSteps++;
             Putusan p = daftarPutusan.get(i);
             if (p.getNomorPerkara().toLowerCase().contains(target)) {
-                auditLog.push("SEARCH_NO | Cari '" + nomorPerkara + "' ditemukan (" + lastSearchSteps + " langkah)");
+                logActivity("SEARCH_NO: Ditemukan '" + nomorPerkara + "' dalam " + lastSearchSteps + " langkah");
                 return p;
             }
         }
-        auditLog.push("SEARCH_NO | Cari '" + nomorPerkara + "' tidak ditemukan (" + lastSearchSteps + " langkah)");
+        logActivity("SEARCH_NO: Tidak ditemukan '" + nomorPerkara + "' setelah " + lastSearchSteps + " langkah");
         return null;
     }
 
-    // Fitur 6: Filter gabungan
-    public DynamicArray<Putusan> filterPutusan(String jenisFilter, double minBerat, double maxBerat,
-                                               String pasalFilter, int minVonis, int maxVonis) {
+    public DynamicArray<Putusan> filterPutusan(String jenis, double minBerat, double maxBerat,
+                                               String pasal, int minVonis, int maxVonis) {
         DynamicArray<Putusan> hasil = new DynamicArray<>();
-        String jenisLower = (jenisFilter == null) ? "" : jenisFilter.trim().toLowerCase();
-        String pasalLower = (pasalFilter == null) ? "" : pasalFilter.trim().toLowerCase();
+        String jenisFilter = (jenis == null) ? "" : jenis.trim().toLowerCase();
+        String pasalFilter = (pasal == null) ? "" : pasal.trim().toLowerCase();
 
         for (int i = 0; i < daftarPutusan.size(); i++) {
             Putusan p = daftarPutusan.get(i);
+            boolean matchJenis = jenisFilter.isEmpty() || p.getJenisNarkotika().toLowerCase().contains(jenisFilter);
+            boolean matchMinBerat = (minBerat < 0) || p.getBeratBarangBuktiGram() >= minBerat;
+            boolean matchMaxBerat = (maxBerat < 0) || p.getBeratBarangBuktiGram() <= maxBerat;
+            boolean matchPasal = pasalFilter.isEmpty() || p.getPasalTerbukti().toLowerCase().contains(pasalFilter);
+            boolean matchMinVonis = (minVonis < 0) || p.getVonisBulan() >= minVonis;
+            boolean matchMaxVonis = (maxVonis < 0) || p.getVonisBulan() <= maxVonis;
 
-            boolean matchJenis = jenisLower.isEmpty() || p.getJenisNarkotika().toLowerCase().contains(jenisLower);
-            boolean matchBeratMin = (minBerat < 0) || (p.getBeratBarangBuktiGram() >= minBerat);
-            boolean matchBeratMax = (maxBerat < 0) || (p.getBeratBarangBuktiGram() <= maxBerat);
-            boolean matchPasal = pasalLower.isEmpty() || p.getPasalTerbukti().toLowerCase().contains(pasalLower);
-            boolean matchVonisMin = (minVonis < 0) || (p.getVonisBulan() >= minVonis);
-            boolean matchVonisMax = (maxVonis < 0) || (p.getVonisBulan() <= maxVonis);
-
-            if (matchJenis && matchBeratMin && matchBeratMax && matchPasal && matchVonisMin && matchVonisMax) {
+            if (matchJenis && matchMinBerat && matchMaxBerat && matchPasal && matchMinVonis && matchMaxVonis) {
                 hasil.add(p);
             }
         }
-
-        auditLog.push("FILTER | Hasil filter: " + hasil.size() + " putusan cocok");
+        lastResult = hasil;
+        logActivity("FILTER: Ditemukan " + hasil.size() + " putusan sesuai kriteria");
         return hasil;
     }
 
-    // Fitur 7: Agregasi statistik tanpa java.util
-    public String hitungStatistik() {
+    public DynamicArray<Putusan> urutkanByVonis(boolean ascending) {
+        int n = daftarPutusan.size();
+        Putusan[] copy = new Putusan[n];
+        for (int i = 0; i < n; i++) {
+            copy[i] = daftarPutusan.get(i);
+        }
+
+        for (int i = 1; i < n; i++) {
+            Putusan key = copy[i];
+            int j = i - 1;
+            while (j >= 0 && (ascending
+                    ? copy[j].getVonisBulan() > key.getVonisBulan()
+                    : copy[j].getVonisBulan() < key.getVonisBulan())) {
+                copy[j + 1] = copy[j];
+                j--;
+            }
+            copy[j + 1] = key;
+        }
+
+        DynamicArray<Putusan> sorted = new DynamicArray<>(n > 0 ? n : 10);
+        for (int i = 0; i < n; i++) {
+            sorted.add(copy[i]);
+        }
+        lastResult = sorted;
+        logActivity("SORT_VONIS: Mengurutkan " + n + " putusan (" + (ascending ? "ASC" : "DESC") + ")");
+        return sorted;
+    }
+
+    public String getRingkasanStatistik() {
         int n = daftarPutusan.size();
         if (n == 0) {
             return "Dataset kosong. Tidak ada statistik yang dapat dihitung.";
         }
 
         long totalVonis = 0;
-        long totalDenda = 0;
-        double totalBerat = 0.0;
         int minVonis = Integer.MAX_VALUE;
         int maxVonis = Integer.MIN_VALUE;
+        double totalBerat = 0.0;
+        long totalDenda = 0;
 
-        // Array paralel untuk menghitung distribusi jenis narkotika tanpa HashMap
-        String[] namaZat = new String[n];
-        int[] jumlahZat = new int[n];
-        int uniqueZatCount = 0;
+        String[] kategori = new String[n];
+        int[] jumlahKategori = new int[n];
+        int jumlahUnik = 0;
 
         for (int i = 0; i < n; i++) {
             Putusan p = daftarPutusan.get(i);
             int v = p.getVonisBulan();
             totalVonis += v;
-            totalDenda += p.getDendaRupiah();
-            totalBerat += p.getBeratBarangBuktiGram();
-
             if (v < minVonis) minVonis = v;
             if (v > maxVonis) maxVonis = v;
+            totalBerat += p.getBeratBarangBuktiGram();
+            totalDenda += p.getDendaRupiah();
 
-            String zat = p.getJenisNarkotika();
+            String jn = p.getJenisNarkotika();
             int foundIdx = -1;
-            for (int j = 0; j < uniqueZatCount; j++) {
-                if (namaZat[j].equalsIgnoreCase(zat)) {
-                    foundIdx = j;
+            for (int k = 0; k < jumlahUnik; k++) {
+                if (kategori[k].equalsIgnoreCase(jn)) {
+                    foundIdx = k;
                     break;
                 }
             }
-            if (foundIdx >= 0) {
-                jumlahZat[foundIdx]++;
+            if (foundIdx != -1) {
+                jumlahKategori[foundIdx]++;
             } else {
-                namaZat[uniqueZatCount] = zat;
-                jumlahZat[uniqueZatCount] = 1;
-                uniqueZatCount++;
+                kategori[jumlahUnik] = jn;
+                jumlahKategori[jumlahUnik] = 1;
+                jumlahUnik++;
             }
         }
 
-        double rataVonis = (double) totalVonis / n;
         StringBuilder sb = new StringBuilder();
-        sb.append("=== STATISTIK PUTUSAN NARKOTIKA ===\n");
-        sb.append("Total Perkara          : ").append(n).append(" putusan\n");
-        sb.append(String.format("Rata-rata Vonis        : %.2f bulan\n", rataVonis));
-        sb.append("Vonis Terpendek        : ").append(minVonis).append(" bulan\n");
-        sb.append("Vonis Terpanjang       : ").append(maxVonis).append(" bulan\n");
-        sb.append(String.format("Total Barang Bukti     : %.4f gram\n", totalBerat));
-        sb.append(String.format("Total Denda Rupiah     : Rp%,d\n", totalDenda));
+        sb.append("=== RINGKASAN STATISTIK PUTUSAN ===\n");
+        sb.append(String.format("Total Perkara          : %d putusan\n", n));
+        sb.append(String.format("Rata-rata Lama Vonis   : %.2f bulan\n", (double) totalVonis / n));
+        sb.append(String.format("Vonis Terendah         : %d bulan\n", minVonis));
+        sb.append(String.format("Vonis Tertinggi        : %d bulan\n", maxVonis));
+        sb.append(String.format("Total Berat Barang Bukti: %.4f gram\n", totalBerat));
+        sb.append(String.format("Total Denda            : Rp%,d\n", totalDenda));
         sb.append("\nDistribusi Jenis Narkotika:\n");
-        for (int i = 0; i < uniqueZatCount; i++) {
-            sb.append(String.format("  - %-25s : %d perkara\n", namaZat[i], jumlahZat[i]));
+        for (int k = 0; k < jumlahUnik; k++) {
+            sb.append(String.format(" - %-25s : %d perkara\n", kategori[k], jumlahKategori[k]));
         }
 
-        auditLog.push("STATS | Menghitung statistik agregasi dari " + n + " putusan");
+        logActivity("STATS: Menghitung agregasi statistik dari " + n + " putusan");
         return sb.toString();
     }
 
-    // Fitur 8: Pengurutan (Insertion Sort pada salinan baru agar struktur utama tidak berubah)
-    public DynamicArray<Putusan> urutkanByVonis(boolean ascending) {
-        int n = daftarPutusan.size();
-        DynamicArray<Putusan> salinan = new DynamicArray<>(Math.max(10, n));
-        for (int i = 0; i < n; i++) {
-            salinan.add(daftarPutusan.get(i));
+    public void exportToCsv(String outputPath, DynamicArray<Putusan> data) throws IOException {
+        File file = new File(outputPath);
+        if (file.getParentFile() != null) {
+            file.getParentFile().mkdirs();
         }
-
-        for (int i = 1; i < n; i++) {
-            Putusan key = salinan.get(i);
-            int j = i - 1;
-            while (j >= 0 && (ascending
-                    ? salinan.get(j).getVonisBulan() > key.getVonisBulan()
-                    : salinan.get(j).getVonisBulan() < key.getVonisBulan())) {
-                salinan.set(j + 1, salinan.get(j));
-                j--;
-            }
-            salinan.set(j + 1, key);
-        }
-
-        auditLog.push("SORT | Mengurutkan " + n + " putusan berdasarkan vonis (" + (ascending ? "ASC" : "DESC") + ")");
-        return salinan;
-    }
-
-    // Fitur 10: Ekspor daftar putusan ke file CSV
-    public void eksporKeCsv(DynamicArray<Putusan> dataEkspor, String outputPath) throws IOException {
-        try (BufferedWriter bw = new BufferedWriter(
-                new OutputStreamWriter(new FileOutputStream(outputPath), StandardCharsets.UTF_8))) {
-            bw.write("caseId,nomorPerkara,pengadilan,tanggalPutusan,terdakwaKode,jenisNarkotika,beratBarangBuktiGram,pasalTerbukti,tuntutanBulan,vonisBulan,dendaRupiah");
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter(file))) {
+            bw.write("caseId,nomorPerkara,pengadilan,tanggalPutusan,terdakwaKode,jenisNarkotika,beratBarangBuktiGram,pasalDakwaan,pasalTerbukti,tuntutanBulan,vonisBulan,dendaRupiah,barangBukti,keadaanMemberatkan,keadaanMeringankan,sourcePages");
             bw.newLine();
-            for (int i = 0; i < dataEkspor.size(); i++) {
-                Putusan p = dataEkspor.get(i);
-                bw.write(String.format("\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",\"%s\",%.4f,\"%s\",%d,%d,%d",
+            for (int i = 0; i < data.size(); i++) {
+                Putusan p = data.get(i);
+                bw.write(String.format("%s,\"%s\",\"%s\",%s,%s,\"%s\",%.4f,\"%s\",\"%s\",%d,%d,%d,\"%s\",\"%s\",\"%s\",\"%s\"",
                         p.getCaseId(), p.getNomorPerkara(), p.getPengadilan(), p.getTanggalPutusan(),
                         p.getTerdakwaKode(), p.getJenisNarkotika(), p.getBeratBarangBuktiGram(),
-                        p.getPasalTerbukti(), p.getTuntutanBulan(), p.getVonisBulan(), p.getDendaRupiah()));
+                        p.getPasalDakwaan(), p.getPasalTerbukti(), p.getTuntutanBulan(),
+                        p.getVonisBulan(), p.getDendaRupiah(), p.getBarangBukti(),
+                        p.getKeadaanMemberatkan(), p.getKeadaanMeringankan(), p.getSourcePages()));
                 bw.newLine();
             }
         }
-        auditLog.push("EXPORT | Mengekspor " + dataEkspor.size() + " data ke " + outputPath);
+        logActivity("EXPORT_CSV: Mengekspor " + data.size() + " putusan ke " + outputPath);
     }
 }
